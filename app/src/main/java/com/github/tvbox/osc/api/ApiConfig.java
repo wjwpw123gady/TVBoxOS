@@ -8,6 +8,7 @@ import android.util.Base64;
 import com.github.catvod.crawler.JarLoader;
 import com.github.catvod.crawler.JsLoader;
 import com.github.catvod.crawler.Spider;
+import com.github.catvod.crawler.SpiderNull;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.LiveChannelGroup;
 import com.github.tvbox.osc.bean.IJKCode;
@@ -29,6 +30,7 @@ import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 import com.lzy.okgo.model.Response;
 import com.orhanobut.hawk.Hawk;
+import com.undcover.freedom.pyramid.PythonLoader;
 
 import org.json.JSONObject;
 
@@ -303,6 +305,9 @@ public class ApiConfig {
     }
 
     private void parseJson(String apiUrl, String jsonStr) {
+        // pyramid
+        PythonLoader.getInstance().setConfig(jsonStr);
+
         JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
         // spider
         spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
@@ -582,12 +587,41 @@ public class ApiConfig {
     }
 
     public Spider getCSP(SourceBean sourceBean) {
+
+        // Getting Pyramid api
+        if (sourceBean.getApi().startsWith("py_")) {
+            try {
+                return PythonLoader.getInstance().getSpider(sourceBean.getKey(), sourceBean.getExt());
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new SpiderNull();
+            }
+        }
+
         boolean js = sourceBean.getApi().endsWith(".js") || sourceBean.getApi().contains(".js?");
         if (js) return jsLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
         return jarLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
     }
 
     public Object[] proxyLocal(Map param) {
+
+        // Getting pyramid api
+        try {
+            if (param.containsKey("api")) {
+                String doStr = param.get("do").toString();
+                if (doStr.equals("ck"))
+                    return PythonLoader.getInstance().proxyLocal("", "", param);
+                SourceBean sourceBean = ApiConfig.get().getSource(doStr);
+                return PythonLoader.getInstance().proxyLocal(sourceBean.getKey(), sourceBean.getExt(), param);
+            } else {
+                String doStr = param.get("do").toString();
+                if (doStr.equals("live"))
+                    return PythonLoader.getInstance().proxyLocal("", "", param);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         return jarLoader.proxyInvoke(param);
     }
 
@@ -698,4 +732,4 @@ public class ApiConfig {
         }
         return content;
     }
-}
+                }
